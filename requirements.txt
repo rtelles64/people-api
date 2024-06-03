@@ -1,9 +1,22 @@
-azure-functions
-azure-identity
-azure-keyvault-secrets
-flake8
-pandas
-pip-chill
-pymongo
-pymssql
-sqlalchemy
+# This file was generated using pipdeptree and the following command
+#   pipdeptree --warn silence --local-only --freeze --depth 0 | cut -d "=" -f 1
+#
+# See more on its usage here:
+#   https://github.com/tox-dev/pipdeptree?tab=readme-ov-file#usage
+#
+# The cut command removes the version from the output of pipdeptree. -d "="
+# specifies "=" as the delimiter and -f 1 specifies that we only want the
+# package name. An example parse would be:
+#   connexion==3.1.0
+#   --> cut -d "="
+#   connexion,=3.1.0
+#   --> -f 1
+#   connexion
+# See more here:
+#   https://www.ibm.com/docs/sk/aix/7.1?topic=c-cut-command
+
+connexion
+Flask
+pipdeptree
+setuptools
+swagger_ui_bundle
