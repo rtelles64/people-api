@@ -312,9 +312,149 @@ Using OpenAPI with Swagger offers a nice, clean way to create the API URL endpoi
 
 ### Building Out the Complete API
 
+Now it's time to provide full CRUD access to the `PEOPLE` structure.
 
+Recall that the API definition looks like this:
+
+| Action | HTTP Verb | URL Path              | Description                 |
+| :----- | :-------- | :-------------------- | :-------------------------- |
+| Read   | GET       | `/api/people`         | Read a collection of people |
+| Create | POST      | `/api/people`         | Create a new person         |
+| Read   | GET       | `/api/people/<lname>` | Read a particular person    |
+| Update | PUT       | `/api/people/<lname>` | Update an existing person   |
+| Delete | DELETE    | `/api/people/<lname>` | Delete an existing person   |
+
+To add functionality, we extend both the `swagger.yml` and `people.py` files.
+
+#### Work with Components
+
+Before defining new API paths, we'll add a new block for **components**. Components are building blocks in the OpenAPI specification that you can reference from other parts of your specification.
+
+Add a `components` block with `schemas` for a single person:
+
+```yaml
+# swagger.yml
+
+openapi: 3.0.0
+info:
+  title: "Flask REST API"
+  description: "An API about people and notes"
+  version: "1.0.0"
+
+servers:
+  - url: "/api"
+
+components:
+  schemas:
+    Person:
+      type: "object"
+      required:
+        - lname
+      properties:
+        fname:
+          type: "string"
+        lname:
+          type: "string"
+# ...
+```
+
+A `components` block helps to avoid code duplication. For now, we save only the `Person` data model in the `schemas` block:
+
+- `type` &mdash; The data type of the schema
+- `required` &mdash; The required properties
+
+The dash in front of `- lname` indicates that `required` can contain a list of properties. Any property that you define as `required` must also exist in `properties`, which includes the following:
+
+- `fname` &mdash; The first name of a person
+- `lname` &mdash; The last name of a person
+
+The `type` key defines the value associated with its parent key. For `Person`, all properties are strings. This schema will be presented in Python as a dictionary.
+
+#### Create a New Person
+
+Extend your API endpoints by adding a new block for the `post` request in the `/people` block:
+
+```yaml
+# swagger.yml
+
+# ...
+
+paths:
+  /people:
+    get:
+        # ...
+    post:
+      operationId: "people.create"
+      tags:
+        - People
+      summary: "Create a person"
+      requestBody:
+          description: "Person to create"
+          required: True
+          content:
+            application/json:
+              schema:
+                x-body-name: "person"
+                $ref: "#/components/schemas/Person"
+      responses:
+        "201":
+          description: "Successfully created person"
+```
+
+The structure for `post` looks similar to the existing `get` schema. One difference is that you also send a `requestBody` to the server, since you need to tell Flask the information that it needs to create a new person. Another difference is `operationId`, which is set to `people.create`.
+
+Inside of `content`, you define `application/json` as the **data exchange format** of the API. Different media types can be served in the API requests and responses, but most modern APIs commonly use JSON as the data exchange format. This is useful since JSON objects are pretty much Python dictionaries:
+
+```json
+{
+    "fname": "Tooth",
+    "lname": "Fairy"
+}
+```
+
+This JSON object represents the `Person` component defined in the `swagger.yml` file and is being referenced with `$ref` in `schema`.
+
+We also use a `201` HTTP status code, which is a success response that indicates the creation of a new resource.
+
+With `people.create`, we're telling the server to look for a `create()` function in the `people` module. So we add the function:
+
+```python
+from datetime import datetime
+from flask import abort
+
+# other definitions
+# ...
+
+def create(person):
+    lname = person.get("lname")
+    fname = person.get("fname", "")
+
+    if lname and lname not in PEOPLE:
+        PEOPLE[lname] = {
+            "lname": lname,
+            "fname": fname,
+            "timestamp": get_timestamp(),
+        }
+        return PEOPLE[lname], 201
+    else:
+        abort(
+            406,
+            f"Person with last name {lname} already exists",
+        )
+```
+
+Using Flask's `abort()` function helps you send an error message. The error response is raised when the request body doesn't contain a last name or when a person with this last name already exists.
+
+> **NOTE**
+>
+> By design, a person's last name must be unique, since we're using `lname` as a dictionary key of `PEOPLE`. This means we can't have two people with the same last name in our project, for now.
+
+If the data in the request body is valid, the `PEOPLE` dictionary is updated and the function responds with the new object with a `201` HTTP status code.
+
+#### Handle a Person
 
 [connexion]: https://connexion.readthedocs.io/en/latest/index.html
 [openapi]: https://www.openapis.org/
 [swagger]: https://swagger.io/tools/swagger-ui/
 [rp-flask-api]: https://realpython.com/flask-connexion-rest-api/
+
