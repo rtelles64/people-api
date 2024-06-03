@@ -1,4 +1,5 @@
-# This file was generated using pipdeptree and the following command
+# This file is a donensed form of pip freeze and was generated using pipdeptree
+# and the following command
 #   pipdeptree --warn silence --local-only --freeze --depth 0 | cut -d "=" -f 1
 #
 # See more on its usage here:
