@@ -1,5 +1,7 @@
 # Python REST APIs with Flask, Connexion, and SQLAlchemy
 
+> This application is made using the [Real Python REST APIs with Flask][rp-flask-api] tutorial.
+
 ## Part 1 &mdash; Foundation
 
 In the first part of this tutorial, we create a base Flask project which will plug into our API endpoints. We'll also leverage Swagger UI to create documentation for the API. This will enable us to test the API at each stage and get a useful overview of all endpoints.
@@ -272,6 +274,43 @@ The application instance uses Connexion rather than Flask to connect to the `swa
 The *specification_dir* parameter of the `connexion.App()` function tells Connexion which directory to look in for its configuration file. We then tell the app instance to read the `swagger.yml` file from the specification directory and configure the system to provide the Connexion functionality.
 
 #### Return Data From Your People Endpoint
+
+In `swagger.yml` we configured Connexion with the `operationId` value of `"people.read_all"`. When the API gets an HTTP request for `GET /api/people`, the Flask app calls a `read_all()` function within a `people` module.
+
+In order for this to work, create a `people.py` file with a `read_all()` function:
+
+```python3
+# people.py
+
+# get_timestamp defined
+# ...
+
+# PEOPLE dictionary defined
+# ...
+
+def read_all():
+    return list(PEOPLE.values())
+```
+
+For now, we'll use the `PEOPLE` dictionary as sample data just to get the API working. It's a stand in for a proper databse. Its state *persists* between REST API calls. However, any data that you change will be lost when you restart the web application. This is not ideal for production, but is fine for now.
+
+The `read_all()` function will serve the data when the server receives an HTTP request to `GET /api/people`.
+
+Run the server and navigate the browser to `http://localhost:8000/api/people` to display the list of people on the screen.
+
+We'll explore the API in the next section.
+
+#### Explore Your API Documentation
+
+We now have a single URL endpoint for our REST API. Flask knows what to serve based on based on the API specificication in `swagger.yml`. Additionally, Connexion uses `swagger.yml` to create API documentation at `/api/ui`. You can navigate to `http://localhost:8000/api/ui` to see the documentation in action.
+
+If you click the `/people` endpoint in the interface, then the interface will expand to show more information about the API.
+
+Any time the configuration file changes, the Swagger UI changes as well. You can even try the endpoint out by clicking the *Try it out* button. This can be extremely useful when the API grows. The Swagger UI API documentation gives you a way to explore and experiment with the API without having ot write any code to do so.
+
+Using OpenAPI with Swagger offers a nice, clean way to create the API URL endpoints. Next, we can add additional endpoints to create, update, and delete people in the collection.
+
+### Building Out the Complete API
 
 
 
