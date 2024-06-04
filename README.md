@@ -453,6 +453,187 @@ If the data in the request body is valid, the `PEOPLE` dictionary is updated and
 
 #### Handle a Person
 
+Now let's update `swagger.yml` and `people.py` to work with a new path that handles a single existing person.
+
+```yaml
+# swagger.yml
+
+# ...
+
+components:
+  schemas:
+    # ...
+  parameters:
+    lname:
+      name: "lname"
+      description: "Last name of the person to get"
+      in: path
+      required: True
+      schema:
+        type: "string"
+
+paths:
+  /people:
+    # ...
+  /people/{lname}:
+    get:
+      operationId: "people.read_one"
+      tags:
+        - People
+      summary: "Read one person"
+      parameters:
+        - $ref: "#/components/parameters/lname"
+      responses:
+        "200":
+          description: "Successfully read person"
+```
+
+Similar to the `/people` path, we start with the `get` operation for `/people/{lname}`. The `{lname}` substring is a placeholder for the last name, which you have to pass in as a URL parameter.
+
+> **NOTE**
+>
+> URL parameters are case sensitive. So last names like *Ruprecht* and *ruprecht* will be treated as unique and will return an error if neither one exists.
+
+We'll use the `lname` parameter in other operations, too. So it makes sense to create a component for it and reference it where needed.
+
+Since `operationId` points to a `read_one()` function, we impliment it in `people.py`:
+
+```python
+# people.py
+
+# ...
+
+def read_one(lname):
+    if lname in PEOPLE:
+        return PEOPLE[lname]
+    else:
+        abort(
+            404, f"Person with last name {lname} not found"
+        )
+```
+
+Flask will return the data for a particular person with the provided last name in `PEOPLE`, otherwise the server will return a `404` HTTP error.
+
+To update an existing person, we add a `put` operation to the `swagger.yml` file:
+
+```yaml
+# swagger.yml
+
+# ...
+
+paths:
+  /people:
+    # ...
+  /people/{lname}:
+    get:
+        # ...
+    put:
+      tags:
+        - People
+      operationId: "people.update"
+      summary: "Update a person"
+      parameters:
+        - $ref: "#/components/parameters/lname"
+      responses:
+        "200":
+          description: "Successfully updated person"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              x-body-name: "person"
+              $ref: "#/components/schemas/Person"
+```
+
+And since we have `people.update` as the `operationId`, we implement the `update()` function in `people.py`:
+
+```python
+# people.py
+
+# ...
+
+def update(lname, person):
+    if lname in PEOPLE:
+        PEOPLE[lname]["fname"] = person.get("fname", PEOPLE[lname]["fname"])
+        PEOPLE[lname]["timestamp"] = get_timestamp()
+        return PEOPLE[lname]
+    else:
+        abort(
+            404,
+            f"Person with last name {lname} not found"
+        )
+```
+
+The `update()` function expects two arguments:
+
+- `lname` &mdash; The last name of the person
+- `person` &mdash; The data to update the person with
+
+When a person with the provided last name exists, the `PEOPLE` dictionary's corresponding values will be updated with the `person` data.
+
+To remove a person from the dataset, we add a `delete` operation:
+
+```yaml
+# swagger.yml
+
+# ...
+
+paths:
+  /people:
+    # ...
+  /people/{lname}:
+    get:
+        # ...
+    put:
+        # ...
+    delete:
+      tags:
+        - People
+      operationId: "people.delete"
+      summary: "Delete a person"
+      parameters:
+        - $ref: "#/components/parameters/lname"
+      responses:
+        "204":
+          description: "Successfully deleted person"
+```
+
+Then add the corresponding `delete()` function to `people.py`:
+
+```python
+# people.py
+
+from flask import abort, make_response
+
+# ...
+
+def delete(lname):
+    if lname in PEOPLE:
+        del PEOPLE[lname]
+        return make_response(
+            f"{lname} successfully deleted", 200
+        )
+    else:
+        abort(
+            404,
+            f"Person with last name {lname} not found"
+        )
+```
+
+If the person you want to delete exists in the dataset, then we remove it from `PEOPLE`.
+
+Great! Both `people.py` and `swagger.yml` are complete. With all the endpoints to manage people in place, we can try out our API. Since we used Connexion to connect Flask to Swagger, the API documentation is ready as well!
+
+Because we have a static dictionary to hold our people information, the changes we make won't persist whenever we restart the Flask application. That's why we'll implement a proper database for the project in the next part.
+
+### Conclusion of Part 1
+
+In **Part 1** we created a comprehensive REST API with Flask. With Connexion, and some additional configuration, we were able to provide useful documentation and an interactive system. This makes building a REST API an enjoyable experience.
+
+In **[Part 2](#part-2--database-persistence)**, we'll learn how to use a proper databsae to store and persist data, instead of relying on in-memory storage as was done with the `PEOPLE` dictionary.
+
+## Part 2 &mdash; Database Persistence
+
 [connexion]: https://connexion.readthedocs.io/en/latest/index.html
 [openapi]: https://www.openapis.org/
 [swagger]: https://swagger.io/tools/swagger-ui/
