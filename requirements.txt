@@ -18,8 +18,9 @@
 #   https://www.ibm.com/docs/sk/aix/7.1?topic=c-cut-command
 
 # NOTE: Versions are included to ensure a working version of this project
-blinker==1.8.2
 connexion==2.14.1
+flask-marshmallow==0.14.0
 pipdeptree==2.22.0
 setuptools==68.2.2
+SQLAlchemy==2.0.30
 swagger-ui-bundle==0.0.9
