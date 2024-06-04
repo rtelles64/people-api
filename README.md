@@ -60,16 +60,20 @@ With the commands above, we create a virtual and activate a virtual environment 
 
 #### Add Dependencies
 
+> **REQUIRED**
+>
+> The versions MUST be included in the install so as to ensure functionality of the app in the context of this tutorial.
+
 With the virtual environment activated, we can install **Flask**:
 
 ```shell
-(api_env) $ pip install Flask
+(api_env) $ pip install Flask==2.2.2
 ```
 
 We can also install **[Connexion][connexion]** to handle the HTTP requests:
 
 ```shell
-(api_env) $ pip install "connexion[swagger-ui]"
+(api_env) $ pip install "connexion[swagger-ui]==2.14.1"
 ```
 
 - This command installs Connexion with the added support for [Swagger UI][swagger].
@@ -634,8 +638,69 @@ In **[Part 2](#part-2--database-persistence)**, we'll learn how to use a proper 
 
 ## Part 2 &mdash; Database Persistence
 
+We've created a basic Flask application with some endpoints as the foundation for our REST API. We can now connect it to a database to persist existing data and any changes we make to the collection.
+
+### Planning
+
+In **[Part 1](#part-1--foundation)** we worked with a `PEOPLE` dictionary to store our data. This data structure was handy to get the project up and running. However, any data that was added was lost when the app restarted. In this part, we'll be translating the `PEOPLE` dictionary into a databsae table that'll look like this:
+
+| id | lname    | fname  | timestamp           |
+| :- | :------- | :----- | :------------------ |
+| 1  | Fairy    | Tooth  | 2022-10-08 09:15:10 |
+| 2  | Ruprecht | Knecht | 2022-10-08 09:15:13 |
+| 3  | Bunny    | Easter | 2022-10-08 09:15:27 |
+
+This won't require any changes to the REST API endpoints, but the changes made to the backend will be significant and will result in a much more versatile codebase to help scal the Flask project up in the future.
+
+### Setup
+
+To convert complex data types to and from Python data types, you'll need a **serializer**. For this tutorial, we use [Flask-Marshmallow][flask-marshmallow].
+
+#### Add New Dependencies
+
+> **UPDATE**
+>
+> Due to version conflicts as of the time the tutorial was written and since Python has been updated, the installed versions and formats have been changed.
+
+> **REQUIRED**
+>
+> The versions MUST be included in the install so as to ensure functionality of the app in the context of this tutorial.
+
+Be sure to activate the virtual environment before installing new packages.
+
+With the virtual environment activated, install `flask-marshmallow` with the `sqlalchemy` option:
+
+```shell
+(api_env) $ pip install "flask-marshmallow==0.14.0"
+```
+
+```shell
+(api_env) $ pip install sqlalchemy
+```
+
+Flask-Marshmallow also install `marshmallow`, which provides functionality to serialize and deserialize Python objects as they flow in and out of your REST API, which is based on JSON. Marshmallow converts Python class instances to objects that can be converted to JSON.
+
+Installing `sqlalchemy` will help to leverage the powers of the [SQLAlchemy][sqlalchemy] ORM, which stores each Python object to a database representation of the object's data. This can help continue to think in a Pythonic way and not be concerned with how the object data will be represented in the database.
+
+#### Check That Everything Still Works
+
+After the installs, we need to verify that everything still works as expected:
+
+```shell
+(api_env) $ python3 app.py
+```
+
+After running the app, and navigating your browser to `http://localhost:8000/`, you should see a *"Hello, World!"* statement displayed. Also, your Swagger documentation should still be displayed and functional.
+
+Since the app is still functional, it's time to update the backend with a proper database.
+
+### Initialize the Database
+
 [connexion]: https://connexion.readthedocs.io/en/latest/index.html
+[flask-marshmallow]: https://flask-marshmallow.readthedocs.io/en/latest/
 [openapi]: https://www.openapis.org/
-[swagger]: https://swagger.io/tools/swagger-ui/
 [rp-flask-api]: https://realpython.com/flask-connexion-rest-api/
+[sqlalchemy]: https://realpython.com/python-sqlite-sqlalchemy/
+[swagger]: https://swagger.io/tools/swagger-ui/
+
 
