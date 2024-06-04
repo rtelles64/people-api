@@ -694,13 +694,105 @@ After running the app, and navigating your browser to `http://localhost:8000/`, 
 
 Since the app is still functional, it's time to update the backend with a proper database.
 
-### Initialize the Database
+### Initializing the Database
+
+Currently, we're storing the data of our Flask project in a dictionary. Storing data like this isn't persistent, any changes get lost when we restart the Flask app. On top of that, the structure of the dictionary isn't ideal.
+
+The modifications we'll make will move all the data to a database table. This means the data will be saved to our local machine's disk and will exist between runs of the `app.py` program.
+
+#### Conceptualize Your Database Table
+
+Database tables usually have an auto-incrementing integer value as a primary key, whose value is unique across the entire table and is used as a lookup key to each row. Having a primary key independent of the data stored in the table gives you the freedom to modify any other field in the row.
+
+We're going to follow a database convention of naming the table as singular, so the table will be called `person`.
+
+With this concept in place, it's time to build the table.
+
+#### Build Your Database
+
+We're going to use SQLite as the database engine to store the `PEOPLE` data. [SQLite][sqlite] is a widely used relational database management system (RDBMS) that doesn't need a SQL server to work.
+
+In contrast to other SQL database engines, SQLite works with a single file to maintain all the database functionality. Therefore, to use the database, a program just needs to know how to read and write to a SQLite file.
+
+Python's built-in `sqlite3` module allows you to interact with SQLite databases without any external packages. This makes SQLite particularly useful when starting new Python projects.
+
+In a Python interactive shell (i.e. running `python3` in a Terminal window), create the `people.db` SQLite database:
+
+```shell
+>>> import sqlite3
+>>> conn = sqlite3.connect("people.db")
+>>> columns = [
+...     "id INTEGER PRIMARY KEY",
+...     "lname VARCHAR UNIQUE",
+...     "fname VARCHAR",
+...     "timestamp DATETIME",
+... ]
+>>> create_table_cmd = f"CREATE TABLE person ({','.join(columns)})"
+>>> conn.execute(create_table_cmd)
+<sqlite3.Cursor object at 0x1063f4dc0>
+```
+
+After running `sqlite3.connect("people.db")`, you'll see that Python added a `people.db` database file to your file system.
+
+With `conn.execute()`, you're running a SQL command to create a `person` table with the columns `id`, `lname`, `fname`, and `timestamp`.
+
+Now that the database and table exist, you can add data to it:
+
+```shell
+>>> import sqlite3
+>>> conn = sqlite3.connect("people.db")
+>>> people = [
+...     "1, 'Fairy', 'Tooth', '2022-10-08 09:15:10'",
+...     "2, 'Ruprecht', 'Knecht', '2022-10-08 09:15:13'",
+...     "3, 'Bunny', 'Easter', '2022-10-08 09:15:27'",
+... ]
+>>> for person_data in people:
+...     insert_cmd = f"INSERT INTO person VALUES ({person_data})"
+...     conn.execute(insert_cmd)
+...
+<sqlite3.Cursor object at 0x104ac4dc0>
+<sqlite3.Cursor object at 0x104ac4f40>
+<sqlite3.Cursor object at 0x104ac4fc0>
+
+>>> conn.commit()
+```
+
+Once connected to the `people.db`, you declare a transaction to insert `people_data` into the `person` table. The `conn.execute()` command creates `sqlite3.Cursor` objects in memory. Only when you run `conn.commit()` do you make the transactions happen.
+
+#### Interact with the Database
+
+Unlike programming languages, SQL doesn't define *how* to get the data. SQL describes *what* data is desired and leaves the how up to the database engine.
+
+In the following Python code, you use SQLite to run a query that displays all the data from the `person` table:
+
+```shell
+>>> import sqlite3
+>>> conn = sqlite3.connect("people.db")
+>>> cur = conn.cursor()
+>>> cur.execute("SELECT * FROM person")
+<sqlite3.Cursor object at 0x102357a40>
+
+>>> people = cur.fetchall()
+>>> for person in people:
+...     print(person)
+...
+(1, 'Fairy', 'Tooth', '2022-10-08 09:15:10')
+(2, 'Ruprecht', 'Knecht', '2022-10-08 09:15:13')
+(3, 'Bunny', 'Easter', '2022-10-08 09:15:27')
+```
+
+In the above code, the SQL statement is a string passed directly to the database to execute. In this case, it isn't a big problem because the SQL is a string literal completely under the control of the program. However, the use case for our REST API will be taking user input from the web application and using it to create SQL queries. This can open our application to attacks.
+
+> **Bobby Tables: A Cautionary Tale**
+>
+> 
 
 [connexion]: https://connexion.readthedocs.io/en/latest/index.html
 [flask-marshmallow]: https://flask-marshmallow.readthedocs.io/en/latest/
 [openapi]: https://www.openapis.org/
 [rp-flask-api]: https://realpython.com/flask-connexion-rest-api/
 [sqlalchemy]: https://realpython.com/python-sqlite-sqlalchemy/
+[sqlite]: https://www.sqlite.org/index.html
 [swagger]: https://swagger.io/tools/swagger-ui/
 
 
