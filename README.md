@@ -785,13 +785,51 @@ In the above code, the SQL statement is a string passed directly to the database
 
 > **Bobby Tables: A Cautionary Tale**
 >
-> 
+> Recall that our endpoint to get a single person from the `PEOPLE` data looks like this:
+>
+> `GET /api/people/{lname}`
+>
+> This means the API is expecting a variable, `lname`, in the URL path that it can use to find a single person. The `lname` variable gets set to whatever value is supplied by the user. The SQL generated would be something like:
+>
+> ```sql
+> SELECT * FROM person WHERE lname = 'Fairy'
+> ```
+>
+> This is assuming that the value passed into `lname` was `Fairy`.
+>
+> However, any program that accepts user input is also open to malicious users. Any values set by user-supplied input opens you up to a **[SQL Injection Attack][sql-injection]**. This is sometimes referred to as [Little Bobby Tables][little-bobby-tables].
+>
+> Imagine that a malicious user called your REST API in this way:
+>
+> ```
+> GET /api/people/Fairy';DROP TABLE person;
+> ```
+>
+> The REST API sets the `lname` variable to `'Fairy';DROP TABLE person;'`, which in SQL would be:
+>
+> ```sql
+> SELECT * FROM person WHERE lname = 'Fairy';DROP TABLE person;
+> ```
+>
+> This is a valid SQL statement and when executed by the database will find one record where `lname` matches `Fairy`. But it'll also find the SQL statement delimiter `;` and go right ahead and `DROP` the entire `person` table, essentially wrecking your application.
+>
+> You can protect your program by *sanitizing* all data you get from users of your application. Sanitizing data in this context means having your program examine user-supplied data to make sure it doesn't contain anything dangerous to the program. This can be tricky to do right and would have to be done everywhere user data interacts with the database.
+
+It would be much better if what you got back for `person` was a Python object, where each field is an attribute of the object. That way, you make sure that the objects contained the expected value types and not any malicious commands.
+
+When you interact with a database in Python, you may want to think twice about whether you want to write pure SQL commands. Writing SQL may not only feel inconvenient, it can also cause security issues. This is where SQLAlchemy comes in.
+
+### Connecting SQLite to the Application
+
+
 
 [connexion]: https://connexion.readthedocs.io/en/latest/index.html
 [flask-marshmallow]: https://flask-marshmallow.readthedocs.io/en/latest/
+[little-bobby-tables]: https://xkcd.com/327/
 [openapi]: https://www.openapis.org/
 [rp-flask-api]: https://realpython.com/flask-connexion-rest-api/
 [sqlalchemy]: https://realpython.com/python-sqlite-sqlalchemy/
+[sql-injection]: https://realpython.com/prevent-python-sql-injection/
 [sqlite]: https://www.sqlite.org/index.html
 [swagger]: https://swagger.io/tools/swagger-ui/
 
