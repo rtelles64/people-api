@@ -821,7 +821,174 @@ When you interact with a database in Python, you may want to think twice about w
 
 ### Connecting SQLite to the Application
 
+In this section, we'll leverage **SQLAlchemy** to communicate with the database and connect `people.db` to the Flask app.
 
+SQLAlchemy handles many of the interactions specific to particular databases. It will also sanitize user data for you before creating SQL statements.
+
+We'll create two new Python modules:
+
+- `config.py` &mdash; gets the necessary modules imported into the program and configured (including Flask, Connexion, SQLAlchemy, and Marshmallow)
+
+- `models.py` &mdash; creates the SQLAlchemy and Marshmallow class definitions
+
+#### Configure Your Database
+
+Create the `config.py` file in the root directory of the project:
+
+```python
+# config.py
+
+import pathlib
+import connexion
+from flask_sqlalchemy import SQLAlchemy
+from flask_marshmallow import Marshmallow
+
+basedir = pathlib.Path(__file__).parent.resolve()
+connex_app = connexion.App(__name__, specification_dir=basedir)
+
+app = connex_app.app
+app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{basedir / 'people.db'}"
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+db = SQLAlchemy(app)
+ma = Marshmallow(app)
+```
+
+> **NOTE**
+>
+> Due to version conflicts, the project will use the sqlalchemy module on its own, and not the flask_sqlalchemy extension. As such, `db` will be instantiated like so:
+>
+> ```python
+> import sqlalchemy
+>
+> # configuration code
+>
+> db = sqlalchemy.create_engine(SQLALCHEMY_DATABASE_URI)
+> ```
+
+#### Model Data with SQLAlchemy
+
+One of the major features SLQAlchemy provides is an object-relational mapper (ORM). This enables you to interact with the `person` database table in a more Pythonic way by mapping a row of fields from the database table to a Python object.
+
+In the `models.py` file, we'll implement a class definition for the data in the `person` table:
+
+```python
+# models.py
+
+from datetime import datetime
+from config import db
+
+class Person(db.Model):
+    __tablename__ = "person"
+    id = db.Column(db.Integer, primary_key=True)
+    lname = db.Column(db.String(32), unique=True)
+    fname = db.Column(db.String(32))
+    timestamp = db.Column(
+        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+```
+
+> **NOTE**
+>
+> Because of the updates to the version conflicts, the actual `models.py` will be different than the code provided in the examples.
+
+The `default=datetime.utcnow` parameter defaults the timestamp value to the current `utcnow` value when a record is created. The `onupdate=datetime.utcnow` parameter updates the timestamp with the current `utcnow` value when the record is updated.
+
+> **Why UTC Timestamps?**
+>
+> Using a UTC timestamp as the default and updated values is a way of standardizing the timestamp's source.
+>
+> The source, or *zero time*, is the timezone from which all other timezones are offset. By using UTC as the zero time source, timestamps are offsets from this standard reference point.
+>
+> Should the application be accessed from different time zones, you have a way to perform date and time calculations. All you need is a UTC timestamp and the destination timezone.
+>
+> If timestamps used local timezones as the source, then you wouldn't be able to achieve these calculations. Without the timestamp source information, you couldn't do any comparisons at all.
+>
+> Working with UTC timestamps is a good standard to follow.
+
+Using SQLAlchemy allows you to think in terms of objects with behavior rather than dealing with raw SQL. This becomes even more beneficial when your database tables become larger and the interactions more complex.
+
+#### Serializing the Modeled Data with Marshmallow
+
+Because SQLAlchemy returns data as Python class instances, Connexion can't serialize these class instances to JSON-formatted data.
+
+> **NOTE**
+>
+> In this context, serializing means converting Python objects, which can contain other Python objects and complex data types, into simpler data structures that can be parsed into JSON data types, which are listed below:
+>
+> - string &mdash; A string type
+> - number &mdash; Numbers supported by Python (integers, floats, etc.)
+> - object &mdash; A JSON object, equivalent to a Python dictionary
+> - array &mdash; Rougly equivalent to a Python list
+> - boolean &mdash; Represented in JSON as `true` or `false`, but in Python as `True` or `False`
+> - null &mdash; Essentially `None` in Python
+>
+> An example would be the timestamps in the `Person` class. These are Python `DateTime` classes, but there's no `DateTime` definition in JSON, so the timesatmp has to be converted to a string in order to exist in a JSON structure.
+
+We use a database for persistent data storage. With SQLAlchemy, you can comfortably communicate with the database from within Python. However, there are two challenges to be solved:
+
+1. The REST API works with JSON instead of Python objects
+2. You must make sure the data you're adding to the database is valid
+
+This is where Marshmallow comes in.
+
+Marshmallow helps to create a `PersonSchema` class, which is like the SQLAlchemy `Person` class that was created. The `PersonSchema` class defines how the attributes of a class will be converted into JSON-friendly formats. Marshmallow also makes sure all attributes are present and contain the expected data type.
+
+Here's how we define the `PersonSchema` class:
+
+```python
+# models.py
+
+from config import db, ma
+
+# Person definition
+# ...
+
+class PersonSchema(ma.SQLAlchemyAutoSchema):
+    class Meta:
+        model = Person
+        load_instance = True
+        sqla_session = db.session
+
+
+person_schema = PersonSchema()
+people_schema = PersonSchema(many=True)
+```
+
+> **NOTE**
+>
+> Please see `models.py` for the updated code.
+
+We import `ma` from `config.py` to enable `PersonSchema` to inherit from `ma.SQLAlchemyAutoSchema`. To find a SQLAlchemy model and a SQLAlchemy session, `SQLAlchemyAutoSchema` looks for and then uses the internal `Meta` class.
+
+For `PersonSchema`, the model is `Person`, and `sqla_session` is `db.session`. This is how Marshmallow finds attributes in the `Person` class and learns the types of those attributes so it knows how to serialize and deserialize them.
+
+With `load_instance`, you're able to deserialize JSON data and load `Person` model instances from it. Finally, you instantiate two schemas, `person_schema` and `people_schema`, that you'll use later.
+
+#### Some Cleanup
+
+It's time to get rid of the old `PEOPLE` data structure. This will make sure any changes we're making to the people data are performed on the database rather than the obsolete `PEOPLE` dictionary.
+
+Furthermore, get rid of any imports, functions, and other data structures that you don't need anymore, and use new imports to add `db` and data from `models.py`:
+
+```python
+# people.py
+
+# Remove: from datetime import datetime
+from flask import make_response, abort
+
+from config import db
+from models import Person, people_schema, person_schema
+
+# Remove: get_timestamp():
+# Remove: PEOPLE
+
+# ...
+```
+
+Next we'll update the respective CRUD operation functions to use these new imports.
+
+### Connecting the Database to the API
 
 [connexion]: https://connexion.readthedocs.io/en/latest/index.html
 [flask-marshmallow]: https://flask-marshmallow.readthedocs.io/en/latest/
