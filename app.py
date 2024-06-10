@@ -1,16 +1,16 @@
-import connexion
+import config
 
 from flask import render_template
+from models import Person, session
 
-# Use connexion instead to create the app so that it can read in the
-# swagger.yml file
-app = connexion.App(__name__, specification_dir="./")
-app.add_api("swagger.yml")
+app = config.connex_app
+app.add_api(config.basedir / "swagger.yml")
 
 
 @app.route("/")
 def home():
-    return render_template("home.html")
+    people = session.query(Person).all()
+    return render_template("home.html", people=people)
 
 
 if __name__ == "__main__":
