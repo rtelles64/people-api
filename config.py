@@ -5,6 +5,8 @@ import sqlalchemy
 from flask_marshmallow import Marshmallow
 
 basedir = pathlib.Path(__file__).parent.resolve()
+# Use connexion instead to create the app so that it can read in the
+# swagger.yml file
 connex_app = connexion.App(__name__, specification_dir=basedir)
 
 SQLALCHEMY_DATABASE_URI = f"sqlite:///{basedir / 'people.db'}"
