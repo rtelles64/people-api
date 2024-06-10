@@ -1102,7 +1102,73 @@ With these changes in place, it's time to update the frontend to leverage Swagge
 
 #### Display Data in the Frontend
 
+Now our Flask app is connected to the database. Let's adjust `app.py` to get test the new logic on the frontend:
 
+```python
+# app.py
+
+from flask import render_template
+# Remove: import connexion
+import config
+from models import Person
+
+app = config.connex_app
+app.add_api(config.basedir / "swagger.yml")
+
+@app.route("/")
+def home():
+    people = Person.query.all()
+    return render_template("home.html", people=people)
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=8000, debug=True)
+```
+
+> **NOTE**
+>
+> Please see `app.py` for the updated code.
+
+The app is now configured to work with `config.py` and `models.py`. The `config` module provides the Connexion-flavored Flask app, and the `models` config provides the `Person` model and `session` for us to query the `person` table and pass all hte data to `render_template()`.
+
+To show the `people` data on the frontend, we need to adjust `home.html`:
+
+```html
+<!-- templates/home.html -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>RP Flask REST API</title>
+</head>
+<body>
+    <h1>
+        Hello, People!
+    </h1>
+    <ul>
+        {% for person in people %}
+        <li>{{ person.fname }} {{ person.lname }}</li>
+        {% endfor %}
+    </ul>
+</body>
+</html>
+```
+
+Now run the application and visit `http://localhost:8000` to see the people displayed.
+
+If the home page lists all the people currently in the database, we're successfully connected! Now use the Swagger UI to create, update, and delete people and see the changes reflected on the homepage.
+
+You can leverage the API to add, update, and remove people. When you restart the app, data doesn't reset anymore since we now have a database connected and the data is saved.
+
+### Conclusion of Part 2
+
+Congratulations! In **Part 2** we successfully connected a database to our Flask app in order to persist data and changes. We also leverages SQLAlchemy and Marshmallow to communicate with the database and Marshmallow to serialize and deserialize data to Python and JSON-friendly formats.
+
+These skills are definitely a step up in complexity from **[Part 1](#part-1--foundation)**.
+
+In **[Part 3](#part-3--database-relationships)**, we'll the REST API so that you can create, read, update, and delete notes. These notes will be stored in a new database table and every note will be connected to a person, so we'll need to add relationships between database tables.
+
+## Part 3 &mdash; Database Relationships
 
 [connexion]: https://connexion.readthedocs.io/en/latest/index.html
 [flask-marshmallow]: https://flask-marshmallow.readthedocs.io/en/latest/
