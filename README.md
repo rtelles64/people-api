@@ -990,6 +990,120 @@ Next we'll update the respective CRUD operation functions to use these new impor
 
 ### Connecting the Database to the API
 
+The database is connected to the Flask app but not to the REST API yet. Potentially you can use the Python interactive shell to add more people to the database, but it'll be much more fun to enhance the REST API and utilize existing endpoints to add data.
+
+Let's update the existing functions so that they can work with the `people.db` database.
+
+#### Read from the Database
+
+First we'll start with the `read_all()` function in `people.py`:
+
+```python
+# people.py
+
+# ...
+
+def read_all():
+    people = Person.query.all()
+    return people_schema.dump(people)
+
+# ...
+```
+
+> **NOTE**
+>
+> Please see `people.py` for the updated code.
+
+Notice that we use the `people_schema` which is an instance of the Marshmallow `PersonSchema` class created with the parameter `many=True`. This parameter tells `PersonSchema` to expect an iterable to serialize. This is important because the `people` variable contains a list of database items.
+
+You serialize the Python objects with `.dump()` and return the data of all the people as a response to the REST API call.
+
+Let's update the `read_one()` function which receives input in order to read data:
+
+```python
+# people.py
+
+# ...
+
+def read_one(lname):
+    person = Person.query.filter(Person.lname == lname).one_or_none()
+
+    if person is not None:
+        return person_schema.dump(person)
+    else:
+        abort(404, f"Person with last name {lname} not found")
+
+# ...
+```
+
+We use `lname` in the query's `.filter()` method. And rather than using `.all()` we use `.one_or_none()` to get one person, or return `None` if no match is found.
+
+If a person is found, then `person` contains a `Person` object and the serialized object gets returned. Otherwise, we abort with an error.
+
+#### Write to the Database
+
+Modifying the `create()` functions gives us an opportunity to use the Marshmallow `PersonSchema` to deserialize a JSON structure sent with the HTTP request to create a SQLAlchemy `Person` object:
+
+```python
+# people.py
+
+# ...
+
+def create(person):
+    lname = person.get("lname")
+    existing_person = Person.query.filter(Person.lname == lname).one_or_none()
+
+    if existing_person is None:
+        new_person = person_schema.load(person, session=db.session)
+        db.session.add(new_person)
+        db.session.commit()
+        return person_schema.dump(new_person), 201
+    else:
+        abort(406, f"Person with last name {lname} already exists")
+
+# ...
+```
+
+Since `create()` receives a `person` object (i.e. a dictionary), we need to deserialize it in order to add it to the database. This object must have an `lname` attribute and that value must not already exist in the database.
+
+If the person doesn't already exist in the database, we deserialize it with `person_schema.load()`, passing in the `person` object and the `session`. We then add it to the session and commit `new_person` to the database. The database assigns a new primary key and a UTC-based timestamp to the object.
+
+Now let's refactor the `update()` and `delete()` functions:
+
+```python
+# people.py
+
+# ...
+
+def update(lname, person):
+    existing_person = Person.query.filter(Person.lname == lname).one_or_none()
+
+    if existing_person:
+        update_person = person_schema.load(person, session=db.session)
+        existing_person.fname = update_person.fname
+        db.session.merge(existing_person)
+        db.session.commit()
+        return person_schema.dump(existing_person), 201
+    else:
+        abort(404, f"Person with last name {lname} not found")
+
+def delete(lname):
+    existing_person = Person.query.filter(Person.lname == lname).one_or_none()
+
+    if existing_person:
+        db.session.delete(existing_person)
+        db.session.commit()
+        return make_response(f"{lname} successfully deleted", 200)
+    else:
+        abort(404, f"Person with last name {lname} not found")
+```
+
+With these changes in place, it's time to update the frontend to leverage Swagger UI to try out if the database works as expected.
+
+#### Display Data in the Frontend
+
+
+
 [connexion]: https://connexion.readthedocs.io/en/latest/index.html
 [flask-marshmallow]: https://flask-marshmallow.readthedocs.io/en/latest/
 [little-bobby-tables]: https://xkcd.com/327/
