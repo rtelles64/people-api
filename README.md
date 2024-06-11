@@ -1428,6 +1428,137 @@ Once the project contains a fresh database, we can adjust it to display the note
 
 ### Displaying People with Their Notes
 
+Now that the database contains data to work with, we can start displaying it in the front end.
+
+#### Show Notes in the Frontend
+
+Update `home.html` in the `templates/` folder to access a peron's note:
+
+```html
+<!-- templates/home.html -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>RP Flask REST API</title>
+</head>
+<body>
+    <h1>
+        Hello, People!
+    </h1>
+    {% for person in people %}
+    <h2>{{ person.fname }} {{ person.lname }}</h2>
+    <ul>
+        {% for note in person.notes %}
+        <li>
+            {{ note.content }}
+        </li>
+        {% endfor %}
+    </ul>
+    {% endfor %}
+</body>
+</html>
+```
+
+In the code above, we access the `.notes` attribute of each `person`. After, we access each note's `.content` attribute.
+
+Run the application and navigate to `http://localhost:8000` to see that the people and their respective notes are displayed.
+
+If you see that the people and their notes are being displayed, this means Flask successfully connects `Person` and `Notes` under the hood and servers you a `people` object that you can conveniently work with.
+
+#### Respond with Notes
+
+Our front end works and displays notes along with people. However, if we visit `http://localhost:8000/api/people`, we'll see that it only returns people without their respective notes.
+
+After some investigating, we find that the issue lies within the `PersonSchema` definition. By default, a Marshmallow schema doesn't traverse into related database objects, you have to explicitly tell a schema to include relationships.
+
+To fix this issue, let's update `PersonSchema` in `models.py` to explicitly tell Marshmallow to include relationships:
+
+```python
+# models.py
+
+# ...
+
+class PersonSchema(ma.SQLAlchemyAutoSchema):
+    class Meta:
+        model = Person
+        load_instance = True
+        sqla_session = db.session
+        include_relationships = True
+```
+
+With `include_relationships` in the `Meta` class of `PersonSchema`, you tell Marshmallow to add any related objects to the person schema. However, the result still doesn't return the data as expected. It only returns the id's of the notes and not the contents of the notes.
+
+This isn't as expected, but it is fair since we never told Marshmallow how to deserialize the notes. Let's do that now.
+
+#### Create a Notes Schema
+
+Since the API response only listed the primary keys of each person's notes, we have to help Marshmallow deserialize these notes by creating a `NoteSchema` in `models.py`, beneath the `Note` class but above the `Person` class:
+
+```python
+# models.py
+
+# ...
+
+class Note(db.Model):
+    # ...
+
+class NoteSchema(ma.SQLAlchemyAutoSchema):
+    class Meta:
+        model = Note
+        load_instance = True
+        sqla_session = db.session
+        include_fk = True
+
+class Person(db.Model):
+    # ...
+
+class PersonSchema(ma.SQLAlchemyAutoSchema):
+    # ...
+
+note_schema = NoteSchema()
+# ...
+```
+
+We're referencing `Note` from within `NoteSchema`, so we must place `NoteSchema` underneath the `Note` class to prevent errors. WE also instantiate `NoteSchema` to create an object that we'll refer to later.
+
+Since the `Note` model contains a foreign key, we must set `include_fk` to `True`. Otherwise Marshmallow wouldn't recognize `person_id` during the serialization process.
+
+With the new `NoteSchema` in place, we can reference it in `PeopleSchema`:
+
+```python
+# models.py
+
+from datetime import datetime
+from marshmallow_sqlalchemy import fields
+
+from config import db, ma
+
+# ...
+
+class PersonSchema(ma.SQLAlchemyAutoSchema):
+    class Meta:
+        model = Person
+        load_instance = True
+        sqla_session = db.session
+        include_relationships = True
+
+    notes = fields.Nested(NoteSchema, many=True)
+```
+
+Although we're working with `SQLAlchemyAutoSchema`, we have to explicitly create the `notes` field in `PersonSchema`. Otherwise, Marshmallow doesn't receive all the information it needs to work with the `Notes` data. For example, without the `many` argument, it won't know to expect a list of objects.
+
+With these changes, check the `http://localhost:8000/api/people` endpoint returns the data as expected.
+
+Great! We indirectly corrected our `read_all()` function to not only return all the people, but their related notes as well!
+
+Next, we'll extend the REST API to create, read, update, and delete a single note.
+
+### Handle Notes with Your REST API
+
+
+
 [connexion]: https://connexion.readthedocs.io/en/latest/index.html
 [flask-marshmallow]: https://flask-marshmallow.readthedocs.io/en/latest/
 [little-bobby-tables]: https://xkcd.com/327/
