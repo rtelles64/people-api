@@ -19,6 +19,9 @@
 
 # NOTE: Versions are included to ensure a working version of this project
 connexion==2.14.1
+# This version of Flask is required for connexion to work. By default,
+# Flask==2.3.3 is installed so we force pip to use 2.2.2
+Flask==2.2.2
 flask-marshmallow==0.14.0
 marshmallow-sqlalchemy==1.0.0
 pipdeptree==2.22.0
