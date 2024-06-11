@@ -7,7 +7,7 @@ from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 # Due to version conflicts, the project will use pure sqlalchemy modules on its
 # own, and not the flask_sqlalchemy extension.
 Base = declarative_base()
-Session = sessionmaker(bind=db.engine)
+Session = sessionmaker(bind=db)
 session = Session()
 
 
