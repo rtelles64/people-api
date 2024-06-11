@@ -34,8 +34,8 @@ PEOPLE_NOTES = [
 
 with app.app_context():
     print("INFO: Resetting database...")
-    Base.metadata.drop_all(db.engine)
-    Base.metadata.create_all(db.engine)
+    Base.metadata.drop_all(db)
+    Base.metadata.create_all(db)
     print("INFO: Done.")
 
     print("INFO: Seeding database...")
