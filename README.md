@@ -1355,6 +1355,79 @@ With these modles updated, let's update the database.
 
 #### Feed the Database
 
+We'll use the updated `Person` and new `Note` models to rebuild the `people.db` database. Let's create a helper script named `build_database.py`:
+
+```python
+# build_database.py
+
+from datetime import datetime
+from config import app, db
+from models import Person, Note
+
+PEOPLE_NOTES = [
+    {
+        "lname": "Fairy",
+        "fname": "Tooth",
+        "notes": [
+            ("I brush my teeth after each meal.", "2022-01-06 17:10:24"),
+            ("The other day a friend said, I have big teeth.", "2022-03-05 22:17:54"),
+            ("Do you pay per gram?", "2022-03-05 22:18:10"),
+        ],
+    },
+    {
+        "lname": "Ruprecht",
+        "fname": "Knecht",
+        "notes": [
+            ("I swear, I'll do better this year.", "2022-01-01 09:15:03"),
+            ("Really! Only good deeds from now on!", "2022-02-06 13:09:21"),
+        ],
+    },
+    {
+        "lname": "Bunny",
+        "fname": "Easter",
+        "notes": [
+            ("Please keep the current inflation rate in mind!", "2022-01-07 22:47:54"),
+            ("No need to hide the eggs this time.", "2022-04-06 13:03:17"),
+        ],
+    },
+]
+
+with app.app_context():
+    db.drop_all()
+    db.create_all()
+    for data in PEOPLE_NOTES:
+        new_person = Person(lname=data.get("lname"), fname=data.get("fname"))
+        for content, timestamp in data.get("notes", []):
+            new_person.notes.append(
+                Note(
+                    content=content,
+                    timestamp=datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S"),
+                )
+            )
+        db.session.add(new_person)
+    db.session.commit()
+```
+
+> **NOTE**
+>
+> Due to version conflicts in the installed packages, the code will be updated. Please see `build_database.py` to see these updates.
+
+In the script, we're feeding the database with the content of `PEOPLE_NOTES`. We use `db` from the `config` module so Python knows how to handle `data` and commit it to the corresponding database tables and cells.
+
+> **NOTE**
+>
+> There's logic in `build_database.py`, `.drop_all()` and `.create_all()` that re-creates `people.db`. Any existing data in the database will be lost.
+
+Running `build_database.py` will re-create the database with the new additions, getting it ready for use with the web application:
+
+```shell
+(api_env) $ python build_database.py
+```
+
+Once the project contains a fresh database, we can adjust it to display the notes on the frontend.
+
+### Displaying People with Their Notes
+
 [connexion]: https://connexion.readthedocs.io/en/latest/index.html
 [flask-marshmallow]: https://flask-marshmallow.readthedocs.io/en/latest/
 [little-bobby-tables]: https://xkcd.com/327/
