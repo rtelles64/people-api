@@ -1742,6 +1742,102 @@ Great! We've added endpoints to work with existing notes. Next, we'll add an end
 
 #### Create a Note for a Person
 
+Now it's time to add the functionality to create a new note.
+
+Add `create()` to `notes.py`:
+
+```python
+# notes.py
+
+from flask import make_response, abort
+
+from config import db
+from models import Note, Person, note_schema
+
+# ...
+
+def create(note):
+    person_id = note.get("person_id")
+    person = Person.query.get(person_id)
+
+    if person:
+        new_note = note_schema.load(note, session=db.session)
+        person.notes.append(new_note)
+        db.session.commit()
+        return note_schema.dump(new_note), 201
+    else:
+        abort(
+            404,
+            f"Person not found for ID: {person_id}"
+        )
+```
+
+A note always needs a person to belong to. This is why we need to work with the `Person` model when we create a new note.
+
+We first look for the owner of the note by using the `person_id`, which you provide with the `note` argument for `create()`. If this person exists in the database, then you go ahead and append the new note to `person.notes`.
+
+Although we're working with the `person` table in this case, SQLAlchemy will take care that the note is added to the `note` table as well.
+
+To access `notes.create` with the API, we add another endpoint to `swagger.yml`:
+
+```yaml
+# swagger.yml
+
+# ...
+
+paths:
+  /people:
+    # ...
+  /people/{lname}:
+    # ...
+  /notes:
+    post:
+      operationId: "notes.create"
+      tags:
+        - Notes
+      summary: "Create a note associated with a person"
+      requestBody:
+          description: "Note to create"
+          required: True
+          content:
+            application/json:
+              schema:
+                x-body-name: "note"
+                type: "object"
+                properties:
+                  person_id:
+                    type: "integer"
+                  content:
+                    type: "string"
+      responses:
+        "201":
+          description: "Successfully created a note"
+  /notes/{note_id}:
+    # ...
+```
+
+We add the `/notes` endpoint before `/notes/{note_id}` so that we order the endpoints from general to specific. This order helps to navigate the `swagger.yml` file as the API grows larger.
+
+With the data in the `schema` block of the `requestBody`, you provide Marshmallow the information on how to serialize a note in the API. If you compare this `Note` schema to the `Note` model in `models.py`, you'll notice that the attributes `person_id` and `content` match. The same goes for the fields' types.
+
+You may also notice that not all the note model fields are present in the `components.schemas` block. This is ok because we only use this schema to post new notes. For each note, `id` and `timestamp` are set automatically.
+
+With the endpoints to handle notes in place, it's time to have a look at the API documentation.
+
+#### Explore the Documentation
+
+Navigate to `http://localhost:8000/api/ui` to explore and try out these new API endpoints.
+
+### Conclusion of Part 3
+
+Congratulations! In **Part 3** we adjusted the SQLite database to implement relationships. After that, we translated a `PEOPLE_NOTES` dictionary into data that conforms with the database structure and thus turned the Flask REST API into a note-keeping web application.
+
+We worked with multiple tables to create one-to-many relationships in SQLAlchemy to leverage nested schemas with Marshmallow to display related objects in the frontend.
+
+Knowing how to build and use database relationships gives you a powerful tool to solve many difficult problems.
+
+We've successfully built a REST API to keep track of notes for people.
+
 [connexion]: https://connexion.readthedocs.io/en/latest/index.html
 [flask-marshmallow]: https://flask-marshmallow.readthedocs.io/en/latest/
 [little-bobby-tables]: https://xkcd.com/327/
