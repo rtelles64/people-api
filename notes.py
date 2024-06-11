@@ -2,8 +2,23 @@
 
 from flask import abort, make_response
 
-from config import db
-from models import Note, note_schema, session
+from models import Note, Person, note_schema, session
+
+
+def create(note):
+    person_id = note.get("person_id")
+    person = session.query(Person).get(person_id)
+
+    if person:
+        new_note = note_schema.load(note, session=session)
+        person.notes.append(new_note)
+        session.commit()
+        return note_schema.dump(new_note), 201
+    else:
+        abort(
+            404,
+            f"Person not found for ID: {person_id}"
+        )
 
 
 def read_one(note_id):
