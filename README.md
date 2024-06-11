@@ -1295,7 +1295,65 @@ With these advantages in mind, let's create the models that represent the new da
 
 ### Extending Your Database
 
+We're going to modify the `Person` class in `models.py` so that it's aware of both the `person` and the `note` tables and the relationship between them.
 
+#### Create SQLAlchemy Models
+
+Let's start by updating the `Person` model to include a relationship to a collection of notes:
+
+```python
+# models.py
+
+from datetime import datetime
+from config import db, ma
+
+class Person(db.Model):
+    __tablename__ = "person"
+    person_id = db.Column(db.Integer, primary_key=True)
+    lname = db.Column(db.String(32), unique=True)
+    fname = db.Column(db.String(32))
+    timestamp = db.Column(
+        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+    notes = db.relationship(
+        Note,
+        backref="person",
+        cascade="all, delete, delete-orphan",
+        single_parent=True,
+        order_by="desc(Note.timestamp)"
+    )
+
+# ...
+```
+
+With the `Person` model updated to have a `.notes` attribute representing the one-to-many relationship to `Note` objects, lets' define a `Note` model. Since we reference `Note` from within `Person`, define the new `Note` class before the `Person` class:
+
+```python
+# models.py
+
+from datetime import datetime
+from config import db, ma
+
+class Note(db.Model):
+    __tablename__ = "note"
+    id = db.Column(db.Integer, primary_key=True)
+    person_id = db.Column(db.Integer, db.ForeignKey("person.id"))
+    content = db.Column(db.String, nullable=False)
+    timestamp = db.Column(
+        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+class Person(db.Model):
+    # ...
+
+# ...
+```
+
+The `Note` class defines the attributes that make up a note, creating the `.id` attribute as the primary key, and `.person_id` as the foreign key relating `Note` to `Person` using the `.person.id` primary key.
+
+With these modles updated, let's update the database.
+
+#### Feed the Database
 
 [connexion]: https://connexion.readthedocs.io/en/latest/index.html
 [flask-marshmallow]: https://flask-marshmallow.readthedocs.io/en/latest/
