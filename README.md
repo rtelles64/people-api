@@ -1557,7 +1557,190 @@ Next, we'll extend the REST API to create, read, update, and delete a single not
 
 ### Handle Notes with Your REST API
 
+`Notes` are available as a nested schema in `People`. You receive ethe list of notes when you request a collection of people or a particular person.
 
+While we can read the notes of a particular person, there's currently no way to read only one note or manage any of the notes in the database.
+
+We'll add additional endpoints to provide functionality to create, read, update, and delete notes:
+
+| Action | HTTP Verb | URL Path               | Description               |
+| :----- | :-------- | :--------------------- | :------------------------ |
+| Create | POST      | `/api/notes`           | Create a new note         |
+| Read   | GET       | `/api/notes/<note_id>` | Read a single note        |
+| Update | PUT       | `/api/notes/<note_id>` | Update an existing note   |
+| Delete | DELETE    | `/api/notes/<note_id>` | Delete an existing note   |
+
+Let's adjust the Swagger configuration file to add this functionality.
+
+#### Read a Single Note
+
+To get information about one note, we add another endpoint.
+
+Let's get started by adding a `note_id` parameter component to the `swagger.yml` file:
+
+```yaml
+# swagger.yml
+
+# ...
+
+components:
+  schemas:
+    # ...
+
+  parameters:
+    lname:
+      # ...
+    note_id:
+      name: "note_id"
+      description: "ID of the note"
+      in: path
+      required: true
+      schema:
+        type: "integer"
+# ...
+```
+
+The `note_id` parameter will be a part of the endpoints to identify which note you want to handle.
+
+Now we can add data for the endpoint to read a single note:
+
+```yaml
+# swagger.yml
+
+# ...
+
+paths:
+  /people:
+    # ...
+  /people/{lname}:
+    # ...
+  /notes/{note_id}:
+    get:
+      operationId: "notes.read_one"
+      tags:
+        - Notes
+      summary: "Read one note"
+      parameters:
+        - $ref: "#/components/parameters/note_id"
+      responses:
+        "200":
+          description: "Successfully read one note"
+```
+
+The structure of `/notes/{note_id}` is similar to `/people/{lname}`. We'll start with the `get` operation for the path. We call this endpoint like `http://localhost:8000/api/notes/1` which will give the data for the note with primary key `1`.
+
+The `operationId` points to `notes.read_one`, so we need to create a `notes.py` file and add a `read_one()` function:
+
+```python
+# notes.py
+
+from flask import abort, make_response
+
+from config import db
+from models import Note, note_schema
+
+def read_one(note_id):
+    note = Note.query.get(note_id)
+
+    if note is not None:
+        return note_schema.dump(note)
+    else:
+        abort(
+            404, f"Note with ID {note_id} not found"
+        )
+```
+
+For now, we're only reading the `note_id` parameter from the URL path. We use `note_id` in the query's `.get()` method to get the note with the primary key of the `note_id` integer.
+
+If a note is found, then `note` contains a `Note` object and is returned serialized. Visit `http://localhost:8000/api/notes/1` to see that the endpoint returns the note with id of `1`.
+
+Next, we'll use the same endpoint to update and delete a note.
+
+#### Update and Delete a Note
+
+Now, let's create functions in `notes.py` before creating their respective operations in `swagger.yml`:
+
+```python
+# notes.py
+
+# ...
+
+def update(note_id, note):
+    existing_note = Note.query.get(note_id)
+
+    if existing_note:
+        update_note = note_schema.load(note, session=db.session)
+        existing_note.content = update_note.content
+        db.session.merge(existing_note)
+        db.session.commit()
+        return note_schema.dump(existing_note), 201
+    else:
+        abort(404, f"Note with ID {note_id} not found")
+
+def delete(note_id):
+    existing_note = Note.query.get(note_id)
+
+    if existing_note:
+        db.session.delete(existing_note)
+        db.session.commit()
+        return make_response(f"{note_id} successfully deleted", 204)
+    else:
+        abort(404, f"Note with ID {note_id} not found")
+```
+
+`update()` and `delete()` are similar in structure but differ in function signature. Whereas you only need to know the ID of the note in order to call `delete()`, `update()` takes both an ID and a `note` object, which contains the `.content` attribute you may update.
+
+Next, create the two operations in `swagger.yml` that refer to these two functions:
+
+```yaml
+# swagger.yml
+
+# ...
+
+paths:
+  /people:
+    # ...
+  /people/{lname}:
+    # ...
+  /notes/{note_id}:
+    get:
+      # ...
+    put:
+      tags:
+        - Notes
+      operationId: "notes.update"
+      summary: "Update a note"
+      parameters:
+        - $ref: "#/components/parameters/note_id"
+      responses:
+        "200":
+          description: "Successfully updated note"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              x-body-name: "note"
+              type: "object"
+              properties:
+                content:
+                  type: "string"
+    delete:
+      tags:
+        - Notes
+      operationId: "notes.delete"
+      summary: "Delete a note"
+      parameters:
+        - $ref: "#/components/parameters/note_id"
+      responses:
+        "204":
+          description: "Successfully deleted note"
+```
+
+Again, the structure of `put` and `delete` are similar except that you need to provide a `requestBody` that contains the note data in order to update the database object.
+
+Great! We've added endpoints to work with existing notes. Next, we'll add an endpoint to create a note.
+
+#### Create a Note for a Person
 
 [connexion]: https://connexion.readthedocs.io/en/latest/index.html
 [flask-marshmallow]: https://flask-marshmallow.readthedocs.io/en/latest/
