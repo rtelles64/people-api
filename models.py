@@ -1,6 +1,6 @@
 from config import db
 from datetime import datetime
-from marshmallow_sqlalchemy import SQLAlchemyAutoSchema
+from marshmallow_sqlalchemy import SQLAlchemyAutoSchema, fields
 from sqlalchemy import Column, ForeignKey, Integer, String, DateTime
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 
@@ -19,6 +19,14 @@ class Note(Base):
     timestamp = Column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
+
+
+class NoteSchema(SQLAlchemyAutoSchema):
+    class Meta:
+        model = Note
+        load_instance = True
+        sqla_session = session
+        include_fk = True
 
 
 class Person(Base):
@@ -57,7 +65,14 @@ class PersonSchema(SQLAlchemyAutoSchema):
         model = Person
         load_instance = True
         sqla_session = session
+        include_relationships = True
+
+    # Even though we're using SQLAlchemyAutoSchema, we still need to define the
+    # notes field, otherwise Marshmallow won't recognize all the information
+    # needed to work with the Notes data.
+    notes = fields.Nested(NoteSchema, many=True)
 
 
+note_schema = NoteSchema()
 person_schema = PersonSchema()
 people_schema = PersonSchema(many=True)
