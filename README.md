@@ -1166,9 +1166,136 @@ Congratulations! In **Part 2** we successfully connected a database to our Flask
 
 These skills are definitely a step up in complexity from **[Part 1](#part-1--foundation)**.
 
-In **[Part 3](#part-3--database-relationships)**, we'll the REST API so that you can create, read, update, and delete notes. These notes will be stored in a new database table and every note will be connected to a person, so we'll need to add relationships between database tables.
+In **[Part 3](#part-3--database-relationships)**, we'll extend the REST API so that you can create, read, update, and delete notes. These notes will be stored in a new database table and every note will be connected to a person, so we'll need to add relationships between database tables.
 
 ## Part 3 &mdash; Database Relationships
+
+In this section we'll create a hierarchical data structure that represents a *one-to-many* relationship. We'll extend the REST API to create, read, update, and delete notes for a person.
+
+### Planning
+
+In **[Part 1](#part-1--foundation)** we built the foundation for our REST API. In **[Part 2](#part-2--database-persistence)** we connected the API to a database to ensure any changes to existing data and new data that was added was persisted when the server restarts.
+
+So far, we've added the ability to save changes made through the REST API to a database using SQLAlchemy and learned how to serialize the data for the REST API using Marshmallow.
+
+Currently, the `people.db` database only contains people data. In this part, we'll add a new table to store notes. To connect notes to a person, we'll create relationships between the entries of the `person` table and the `note` table in the database.
+
+We'll implement a `build_database.py` script to bootstrap `people.db` to contain the necessary people and notes data. Here's a sample dataset:
+
+```python
+PEOPLE_NOTES = [
+    {
+        "lname": "Fairy",
+        "fname": "Tooth",
+        "notes": [
+            ("I brush my teeth after each meal.", "2022-01-06 17:10:24"),
+            ("The other day a friend said I have big teeth.", "2022-03-05 22:17:54"),
+            ("Do you pay per gram?", "2022-03-05 22:18:10"),
+        ],
+    },
+   # ...
+]
+```
+
+We'll also adjust the SQLite database to implement relationships. After that, we'll be able to translate the `PEOPLE_NOTES` dictionary into data that conforms with the database structure.
+
+### Setup
+
+As a refresher, at this point, the file tree should look like this:
+
+```shell
+.
+├── app.py
+├── config.py
+├── models.py
+├── people.py
+├── swagger.yml
+└── templates
+    └── home.html
+```
+
+Of course, it should also include any extra files and folders for the virtual environment you set up. 
+
+#### Check That Everything Still Works
+
+Before continuing, we need to verify that everything still works as expected. With the vritual environment activated, run the app and verify it runs without errors:
+
+```shell
+(api_env) $ python3 app.py
+```
+
+After running the app, and navigating your browser to `http://localhost:8000/`, you should see a *"Hello, People!"* statement displayed along with the list of existing people in the database. Also, your Swagger documentation should still be displayed and functional.
+
+Since the app is still functional, it's time to update the database with the new structure.
+
+#### Inspect the Dataset
+
+The current structure of the database is as follows:
+
+| id | lname    | fname  | timestamp           |
+| :- | :------- | :----- | :------------------ |
+| 1  | Fairy    | Tooth  | 2022-10-08 09:15:10 |
+| 2  | Ruprecht | Knecht | 2022-10-08 09:15:13 |
+| 3  | Bunny    | Easter | 2022-10-08 09:15:27 |
+
+We want to extend this to be similar to the structure provided in the `PEOPLE_NOTES` list above.
+
+We'll still have `lname` and `fname` as columns in the `person` table of the `people.db` database, but now each person will include a key called `notes`, which is associated with a list containing tuples of data. Each tuple in `notes` represents a single note containing the content and a timestamp.
+
+Further, each single person will be associated with multiple notes, and each single note is associated with only one person. This is the *one-to-many* relationship mentioned earlier.
+
+#### Build Relationships with People
+
+Instead of extending the `person` table to represent hierarchical data in a single table, we'll break up the data into mulitple tables and connect them.
+
+This means there will be no changes to the `person` table. However, we'll add a new table called `note` which will represent the new note information:
+
+| id | person_id | content                                         | timestamp           |
+| :- | :-------- | :---------------------------------------------- | :------------------ |
+| 1	 | 1	       | I brush my teeth after each meal.	             | 2022-01-06 17:10:24 |
+| 2	 | 1	       | The other day a friend said, I have big teeth.	 | 2022-03-05 22:17:54 |
+| 3	 | 1	       | Do you pay per gram?	                           | 2022-03-05 22:18:10 |
+| 4	 | 2	       | I swear, I’ll do better this year.	             | 2022-01-01 09:15:03 |
+| 5	 | 2	       | Really! Only good deeds from now on!	           | 2022-02-06 13:09:21 |
+| 6	 | 3	       | Please keep the current inflation rate in mind! | 2022-01-07 22:47:54 |
+| 7	 | 3	       | No need to hide the eggs this time.	           | 2022-04-06 13:03:17 |
+
+Notice that, like the `person` table, the `note` table has its own unique identifier called `id`, which is the primary key for this table. The `person_id` column creates the relationship to the `person` table.
+
+Whereas `id` is the primary key for the table, `person_id` in the `note` table is what's known as the *foreign key*. Using this, SQLAlchemy can gather all the notes associated with each person by connecting the `person.id` primary key to the `note.person_id` foreign key, creating a relationship.
+
+> **Why not stick with one table?**
+>
+> The `PEOPLE_NOTES` dictionary can be represented in a single table, and has the advantage of being relatively simple to understand. This could even be persisted to a CSV file.
+>
+> However, while it's convenient to have all this data stored in one table, there are some practical disadvantages:
+>
+> - Maintenance issues due to *redundant data*
+> - Awkward column names (e.g. `timestamp` and `note_timestamp`)
+> - Difficulty representing one-to-many relationships
+>
+> In order to represent the collection of notes, all the data for each person is repeated for every unique note. The person data is therefore redundant. This becomes a huge storage concern if the table had many more columns and you were dealing with millions of rows of data.
+>
+> Having redundant data can also lead to maintenance issues as time goes by. For example, what if the Easter Bunny decided a name change was in order? Every record containing the Easter Bunny's name would have to be updated in order to keep the data consistent. This can lead to data inconsistency, particulary if done by hand using a SQL query.
+>
+> Also, the column naming becomes awkward. If we included a timestamp column for both the person and the note, we'd have column names like `timestamp` and `note_timestamp`. 
+>
+> Furthermore, if we wanted to add additionaly one-to-many relationships to the table &mdash; we include their children and phone numbers, and each person has multiple children with multiple phone numbers, for example &mdash; then each of these new one-to-many relationships in the `person` table dramatically increases the number of rows necessary to represent a single entry. In addition, the problems associated with data redundancy get bigger and more difficult to handle.
+>
+> Finally, the data in this format would be annoying to work with.
+
+By breaking the dataset into two tables and introducing the concept of a foreign key, we'll make the data a bit more complex to think about. But we resolve the disadvantages of a single table representation.
+
+The advantages are clear with this new relationship structure:
+
+- No redundant data &mdash; There's only one entry for each person you want to store in the database. If the Easter Bunny wanted to change its name, you only have to change a single row in the `person` table, and anything related to that row will immediately take advantage of the change.
+- Concistent and meaningful column names &mdash; Because `person` and `note` data exist in separate tables, creation or update timestamps can be named consistently without conflict.
+
+With these advantages in mind, let's create the models that represent the new database table relationships.
+
+### Extending Your Database
+
+
 
 [connexion]: https://connexion.readthedocs.io/en/latest/index.html
 [flask-marshmallow]: https://flask-marshmallow.readthedocs.io/en/latest/
